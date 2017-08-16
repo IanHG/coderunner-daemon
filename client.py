@@ -4,14 +4,16 @@
 import socket
 import time
 import json
+from bufferedsocket import BufferedMessage
 
 s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 s.connect("/tmp/socketname")
+buff = BufferedMessage(s, "")
 msg = {
    'command' : 'start',
 }
-s.send(json.dumps(msg) + '\0')
+buff.send_protocol_message(json.dumps(msg))
 #s.send(b'Hello, world')
-#data = s.recv(1024)
-s.close()
-#print('Received ' + repr(data))
+data = buff.recv_protocol_message()
+#s.close()
+print('Received ' + repr(data))

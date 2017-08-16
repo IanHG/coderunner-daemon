@@ -16,11 +16,15 @@ def create_upid():
    global_upid += 1
    return global_upid
 
-def run_task():
+def run_task(buff, processes, msg_dict):
    """
    Handle running a task.
    """
    with forkExec(("ls","-lrth")) as handle:
+      pid = handle.pid()
+      buff.send_protocol_message(str(pid))
+      buff.close()
+
       while True:
          line = handle.stdout(1024)
          if not line:
@@ -31,7 +35,7 @@ def start_task(pool, buff, processes, msg_dict):
    """
    Start a task
    """
-   pool.add_task(run_task)
+   pool.add_task(run_task, buff, processes, msg_dict)
 
 def stop_task(pool, buff, processes, msg_dict):
    """
@@ -73,9 +77,10 @@ class CodeRunnerDaemon(Daemon):
       processes = {}
       
       while True:
-         with s.accept() as buff:
-            connection_handler(pool, buff, processes)
-            sys.stdout.flush()
+         #with s.accept() as buff:
+         buff = s.accept()
+         connection_handler(pool, buff, processes)
+         sys.stdout.flush()
 
 if __name__ == "__main__":
    daemon = CodeRunnerDaemon('/tmp/daemon-coderunner.pid', '/dev/null', '/home/ian/programming/python/daemon/std.out', '/home/ian/programming/python/daemon/std.err')

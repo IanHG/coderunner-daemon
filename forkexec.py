@@ -17,14 +17,14 @@ class ForkExecHandle:
    """
    Handle forked process.
    """
-   def __init__(self, pid, stdin, stdout, stderr):
+   def __init__(self, __pid, __stdin, __stdout, __stderr):
       """
       Initialize.
       """
-      self._pid = pid
-      self._stdin = stdin
-      self._stdout = stdout
-      self._stderr = stderr
+      self._pid = __pid
+      self._stdin = __stdin
+      self._stdout = __stdout
+      self._stderr = __stderr
 
    def __enter__(self):
       """
@@ -40,6 +40,12 @@ class ForkExecHandle:
       os.close(self._stdin)
       os.close(self._stdout)
       os.close(self._stderr)
+
+   def pid(self):
+      """
+      Get pid af child process.
+      """
+      return self._pid
 
    def stdin(self, msg):
       """
@@ -59,13 +65,13 @@ class ForkExecHandle:
       """
       return os.read(self._stderr, buffsize)
 
-   def wait(options = 0):
+   def wait(self, options = 0):
       """
       Wait for child process.
       """
-      os.waitpid(_pid, option)
+      os.waitpid(self._pid, options)
 
-   def close(pipe = "all"):
+   def close(self, pipe = "all"):
       """
       Close connections.
       """
