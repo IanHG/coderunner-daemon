@@ -1,16 +1,19 @@
-import os, sys, time
+import os, sys, time, signal, fcntl
 
 def execvpeChild(args, env = None):
    """
    """
    print("CHILD RUNNING ", os.getpid())
+   print(args)
    env = env if env else { }
    
-   #sys.stdout.write("lol")
+   sys.stdout.write("lol")
    if len(args) >= 1:
+      print("exec")
       os.execvpe(args[0], args, env)
    else:
       print "Exec error"
+   sys.stdout.write("EXIT")
    os._exit(0)
 
 class ForkExecHandle:
@@ -37,9 +40,7 @@ class ForkExecHandle:
       Exit
       """
       self.wait(0)
-      os.close(self._stdin)
-      os.close(self._stdout)
-      os.close(self._stderr)
+      self.close("all")
 
    def pid(self):
       """
@@ -57,6 +58,8 @@ class ForkExecHandle:
       """
       Read from stdout.
       """
+      print("READING FROM CHILD")
+      sys.stdout.flush()
       return os.read(self._stdout, buffsize)
    
    def stderr(self, buffsize):
@@ -75,12 +78,29 @@ class ForkExecHandle:
       """
       Close connections.
       """
-      if pipe == "stdin" or pipe == "all":
-         os.close(self._stdin)
+      #if (pipe == "stdin"  or pipe == "all") and fcntl.fcntl(self._stdin , fcntl.F_GETFD):
+      if pipe == "stdin"  or pipe == "all":
+         try:
+            os.close(self._stdin)
+         except OSError:
+            pass
       if pipe == "stdout" or pipe == "all":
-         os.close(self._stdout)
+         try:
+            os.close(self._stdout)
+         except OSError:
+            pass
       if pipe == "stderr" or pipe == "all":
-         os.close(self._stderr)
+         try:
+            os.close(self._stderr)
+         except OSError:
+            pass
+
+   def kill(self):
+      """
+      Kill the child process.
+      """
+      os.kill(self._pid, signal.SIGKILL)
+
 
 
 def forkExec(args):

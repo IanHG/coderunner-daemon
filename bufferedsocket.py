@@ -48,22 +48,18 @@ class BufferedMessage():
       """
       msg = ""
       
-      if len(self.buff) > 0:
-         msg = self.buff
-         self.buff = ""
-
       while True:
+         index = self.buff.find('\0')
+         if index != -1:
+            msg = self.buff[:index]
+            self.buff = self.buff[index + 1:]
+            break
+
          data = self.conn.recv(self.recvsize)
          if not data:
-            print("breaking")
             break
-         index = data.find('\0')
-         if index != -1:
-            msg += data[:index]
-            self.buff = data[index + 1:]
-            break
-         else:
-            msg += data
+
+         self.buff += data
          
       return msg
 
