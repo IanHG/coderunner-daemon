@@ -78,6 +78,7 @@ class Buffered:
       Recieve a message defined by the protocol.
       """
       msg = ""
+      empty = False
 
       while True:
          index = self.buff.find("!")
@@ -88,12 +89,12 @@ class Buffered:
 
          data = handle.stdout(self.recvsize)
          if not data:
-            print("breaking")
+            empty = True
             break
 
          self.buff += data
          
-      return msg
+      return msg, empty
 
 
 def run_task(msg_dict, output, signalqueue):
@@ -101,6 +102,15 @@ def run_task(msg_dict, output, signalqueue):
    Handle running a task.
    """
    print(os.environ['PATH'])
+
+   inp = {
+      'instructions' : msg_dict['instructions'],
+      'function'     : msg_dict['function'],
+   }
+
+   print(json.dumps(inp))
+   sys.stdout.flush()
+
    with forkExec(("/opt/tools/singularity/2.3.1/bin/singularity", "run", "-H", str(msg_dict['homedir']), "--containall", os.path.join(SINGULARITY_IMAGE_DIR, "ubuntu.img"))) as handle:
    #with forkExec(("/home/ian/programming/python/daemon/myprog.py",)) as handle:
    #with forkExec(("/opt/tools/singularity/2.3.1/bin/singularity",)) as handle:
@@ -108,7 +118,7 @@ def run_task(msg_dict, output, signalqueue):
    #with forkExec(("ls","-lrth")) as handle:
       print("sending stdin")
       sys.stdout.flush()
-      handle.stdin(str(msg_dict['input']))
+      handle.stdin(json.dumps(inp) + "!")
       handle.close("stdin")
       print("sent stdin")
       sys.stdout.flush()
@@ -134,8 +144,9 @@ def run_task(msg_dict, output, signalqueue):
          """ Recieve message """
          print("recieving message")
          sys.stdout.flush()
-         mesg = b.recv_protocol_message(handle)
-         if not mesg:
+         mesg, empty = b.recv_protocol_message(handle)
+         #if not mesg:
+         if empty:
             break
          
          print("message recieved")
@@ -209,6 +220,9 @@ def poll_task(pool, buff, processes, msg_dict):
    if upid in processes:
       value = processes[upid]['output'].get()
       if value:
+         value = json.loads(value)
+         value['running'] = processes[upid]['thread'].isAlive()
+         value = json.dumps(value)
          buff.send_protocol_message(value)
       else:
          buff.send_protocol_message("NO OUTPUT")
@@ -222,6 +236,10 @@ def connection_handler(pool, buff, processes):
    Handle a connection to the daemon asynchronously.
    """
    msg = buff.recv_protocol_message()
+   print("Message recieved: \n")
+   print(msg)
+   sys.stdout.flush()
+
    msg_dict = json.loads(msg)
    
    result = {
@@ -240,6 +258,7 @@ class CodeRunnerDaemon(Daemon):
       Overload of daemon run function.
       Will setup a listening socket for listening for requests.
       """
+      print("\n\n\n[[STARTING DAEMON]]")
       print("creating socket")
       setup_environment()
       sys.stdout.flush()

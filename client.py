@@ -15,7 +15,7 @@ msg = {
 size
 4
 max_iterations
-1000
+10
 t_0
 1.0
 k_decay
