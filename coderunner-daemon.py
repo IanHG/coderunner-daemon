@@ -3,6 +3,7 @@
 import sys, time, os, ast
 import json
 import threading
+import datetime
 import Queue
 from daemon import Daemon
 from bufferedsocket import BufferedSocket
@@ -101,13 +102,14 @@ def run_task(msg_dict, output, signalqueue):
    """
    Handle running a task.
    """
-   print(os.environ['PATH'])
+   #print(os.environ['PATH'])
 
    inp = {
       'instructions' : msg_dict['instructions'],
       'function'     : msg_dict['function'],
    }
-
+   
+   print("starting Thread")
    print(json.dumps(inp))
    sys.stdout.flush()
 
@@ -116,60 +118,60 @@ def run_task(msg_dict, output, signalqueue):
    #with forkExec(("/opt/tools/singularity/2.3.1/bin/singularity",)) as handle:
    #with forkExec(("singularity",)) as handle:
    #with forkExec(("ls","-lrth")) as handle:
-      print("sending stdin")
-      sys.stdout.flush()
+      #print("sending stdin")
+      #sys.stdout.flush()
       handle.stdin(json.dumps(inp) + "!")
       handle.close("stdin")
-      print("sent stdin")
-      sys.stdout.flush()
+      #print("sent stdin")
+      #sys.stdout.flush()
       
       b = Buffered()
       started = False
       while True:
-         print("starting outer loop")
-         sys.stdout.flush()
+         #print("starting outer loop")
+         #sys.stdout.flush()
          try:
             sig = signalqueue.get_nowait()
             if sig:
                signalqueue.task_done() # must signal to the queue that task is complete (bullshit interface :D)
                if sig == "KILL":
-                  print("KILLING CHILD")
-                  sys.stdout.flush()
+                  #print("KILLING CHILD")
+                  #sys.stdout.flush()
                   handle.kill()
                   break
          except:
-            print("CAUGHT EXCEPTION")
+            #print("CAUGHT EXCEPTION")
             pass
          
          """ Recieve message """
-         print("recieving message")
-         sys.stdout.flush()
+         #print("recieving message")
+         #sys.stdout.flush()
          mesg, empty = b.recv_protocol_message(handle)
          #if not mesg:
          if empty:
             break
          
-         print("message recieved")
-         print(mesg)
+         #print("message recieved")
+         #print(mesg)
          #time.sleep(1)
-         sys.stdout.flush()
+         #sys.stdout.flush()
          
          """ Process message """
          if (not started) and (mesg.find("SIMULATION_START") != -1):
-            print("SIMULATION STARTET")
-            sys.stdout.flush()
+            #print("SIMULATION STARTET")
+            #sys.stdout.flush()
             started = True
             continue
          
          if (started) and (mesg.find("SIMULATION_FINISHED") != -1):
-            print("SIMULATION FINISHED")
-            sys.stdout.flush()
+            #print("SIMULATION FINISHED")
+            #sys.stdout.flush()
             started = False
             continue
 
          if started:
-            print("SIMULATION OUTPUT")
-            print(mesg)
+            #print("SIMULATION OUTPUT")
+            #print(mesg)
             sys.stdout.flush()
             output.set(mesg)
 
@@ -198,6 +200,8 @@ def start_task(pool, buff, processes, msg_dict):
       'thread' : thread,
       'output' : output,
       'signal' : signalqueue,
+      'starttime' : datetime.datetime.now(),
+      'endtime' : None,
    }
    
    print("task is started")
@@ -229,7 +233,20 @@ def poll_task(pool, buff, processes, msg_dict):
    else:
       buff.send_protocol_message("NO UPID : " + upid)
 
-
+def clean_processes(processes):
+   """
+   Remove all finished processes, which have an end time longer than 1 hour.
+   """
+   for upid in processes:
+      if not processes[upid]['thread'].isAlive():
+         if processes[upid]['endtime']:
+            end = processes[upid]['endtime']
+            now = datetime.datetime.now()
+            delta = now - end
+            if delta.seconds > 3600:
+               del processes[upid]
+         else:
+            processes[upid]['endtime'] = datetime.datetime.now()
 
 def connection_handler(pool, buff, processes):
    """
@@ -273,6 +290,8 @@ class CodeRunnerDaemon(Daemon):
          with s.accept() as buff:
             connection_handler(pool, buff, processes)
             print("Connection handled")
+            clean_processes(processes)
+            print("Clean done")
             sys.stdout.flush()
          print("End of connection loop")
          sys.stdout.flush()
