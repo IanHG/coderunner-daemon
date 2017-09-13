@@ -237,7 +237,7 @@ def clean_processes(processes):
    """
    Remove all finished processes, which have an end time longer than 1 hour.
    """
-   for upid in processes:
+   for upid in processes.keys():
       if not processes[upid]['thread'].isAlive():
          if processes[upid]['endtime']:
             end = processes[upid]['endtime']
